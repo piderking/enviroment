@@ -1,0 +1,26 @@
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Tell setup-uv where your project files are
+      - name: Install uv in src/python
+        uses: astral-sh/setup-uv@v1
+        with:
+          working-directory: src/python  # <--- Use this input
+          enable-cache: true
+          cache-dependency-glob: 'src/python/uv.lock' 
+          
+      # Since setup-uv created the venv in src/python, 
+      # subsequent commands need to run from the same directory.
+      - name: Sync dependencies
+        run: uv sync --locked
+        working-directory: src/python  # <--- Use the standard working-directory key
+        
+      - name: Run tests
+        run: uv run main.py
+        working-directory: src/python
