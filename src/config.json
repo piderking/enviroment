@@ -1,3 +1,8 @@
 {
-	"db": "../database.db"
+	"db": "../database.db",
+	"csv": {
+		"type": "directory",
+		"value": "../../data/csv"
+	}, 
+	"csv-delimiter": ","
 }
