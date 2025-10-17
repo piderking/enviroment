@@ -5,20 +5,21 @@ import pandas as pd
 CSV_PATH = get_config('csv')
 
 
-headers = ["id", "content"]
-item_types = [int, str]
 # id, content --> string
+
+
+item_types = [int, str]
 
 
 class MemoryBank():
     """For Content (NOT EMBEDDINGS (INCLUDES STRINGS))"""
     fileName: str = "data"
     headers: List[str]
-    data: (str, str)
+    data: item_types
+    default_headers = ["id", "content"]
 
     @classmethod
     def verify_type_signature(cls, item: List[Any]) -> item_types:
-
         if not len(item_types) == len(item):
             return False
 
@@ -35,7 +36,7 @@ class MemoryBank():
         logger.debug(f"Reading {data_path}")
         if not os.path.exists(data_path):
             logger.warn(f"Data File for reading: {data_path} is empty...")
-            self.headers = headers
+            self.headers = self.default_headers
             return []
 
         final = []
@@ -111,21 +112,109 @@ class MemoryBank():
 
     def update(self, output_full=False):
 
+        # Updating Write to File
+
         self.write_csv(output_full=output_full)
+
+    def __getitem__(self, index: int | List | str) -> item_types | List[item_types]:
+        if type(index) is int:
+
+            if len(self.data) == 0:
+                raise AttributeError("Empty Data Set...")
+
+            if index >= len(self.data):
+
+                raise AttributeError(
+                    "Not a valid point. Index exceeds size of dataset.")
+
+            return self.data[index]
+
+        elif type(index) == list:
+            if len(index) == 0:
+                logger.warning("Empty List Index Inputed")
+                return []
+            return [self[idx] for idx in index]
+
+        elif type(index) == str and (index.strip().lower() == "all" or index.strip() == "*"):
+            return self.data
+
+        else:
+            raise AttributeError(
+                f"Data {index} Not Found. [0-{len(self.data)}]")
+
+    def __setitem__(self, index: int | List | str, value: item_types | List[item_types]) -> item_types | List[item_types]:
+        if type(index) is int and type(value) is list:
+
+            if len(self.data) == 0:
+                raise AttributeError("Empty Data Set...")
+
+            if index >= len(self.data):
+
+                raise AttributeError(
+                    "Not a valid point. Index exceeds size of dataset.")
+
+            temp = self.data[index]
+            try:
+                self.data[index] = self.verify_type_signature(value)
+
+                # retugrn temp
+            except ValueError as e:
+                raise ValueError(
+                    "Value passed doesn't match type signature...")
+        elif type(index) == list and type(value) == list and len(value) == len(index) and all([type(val) is list for val in value]):
+            for idx, val in zip(index, value):
+                self[idx] = val
+
+        elif type(index) == list and type(value) == list and len(value) == len(index):
+            raise AttributeError(
+                f"Mismatched Lengths (Index: {len(index)}) and (Value: {len(value)})")
+
+        else:
+            raise AttributeError(
+                f"Data {index} Not Found. [0-{len(self.data)}]")
+
+        # all updates need to get written to the file
+        self.update()
 
     def size(self) -> (int, int):
         return (len(self.data), len(self.data[0]) if len(self.data) > 0 else 0)
 
-    def __repr__(self) -> str:
-        # text = "\n".join(["|".join(row) for row in self.data])
+    def push(self, value: item_types | List[item_types]):
+        if type(value) is not list:
+            raise TypeError("List of Values Must be Passed")
+        if len(value) > 0 and type(value[0]) is list:
+            for val in value:
+                self.push(val)
+        elif len(value) > 0:
+            self.data.append(self.verify_type_signature(value))
 
-        # return f"Size: {str(self.size())}\n\n|{" | ".join(self.headers)}|\n{self.data}"
-        return ""
+        self.update()
+
+    def remove(self, idx: int | List[int]) -> item_types | List[item_types]:
+
+        if type(idx) is int:
+            self.data.pop(idx)
+
+        elif type(idx) is list:
+            # so we don't cut anything off
+            idx = sorted(idx, reverse=True)
+
+            for id in idx:
+                self.remove(id)
+
+        self.update()
+
+    def __repr__(self) -> str:
+        text = "\n".join(["|" + "|".join([str(col)
+                         for col in row]) + "|" for row in self.data])
+
+        return f"Size: {str(self.size())}\n\n|{'|'.join(self.headers)}|\n{text}"
 
 
 if __name__ == "__main__":
 
     db = MemoryBank(data=[["1", "world"]])
-    print(db.headers)
+
+    db.push(["1", "apple"])
 
     print(db.data)
